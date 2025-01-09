@@ -147,5 +147,10 @@ if (in_array("Clair3", $dbs))
     exec2("tar xzf r941_prom_hac_g360+g422.tar.gz");
     exec2("rm r941_prom_hac_g360+g422.tar.gz");
     exec2("mv ont/ r941_prom_hac_g360+g422/");
+
+    print "Downloading Clair3 model 'hifi_revio' from 'http://www.bio8.cs.hku.hk/clair3/clair3_models/hifi_revio.tar.gz'\n";
+    exec2("wget http://www.bio8.cs.hku.hk/clair3/clair3_models/hifi_revio.tar.gz");
+    exec2("tar xzf hifi_revio.tar.gz");
+    exec2("rm hifi_revio.tar.gz");
 }
 ?>

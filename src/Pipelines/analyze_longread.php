@@ -401,6 +401,10 @@ if (in_array("vc", $steps))
 		{
 			$basecall_model_path = get_path("clair3_models")."/r1041_e82_400bps_sup_v500/";
 		}
+		else if ($sys["name_short"] == "LR-PB-SPRQ")
+		{
+			$basecall_model_path = get_path("clair3_models")."/hifi_revio/";
+		}
 		else
 		{
 			trigger_error("Unsupported processing system '".$sys["shortname"]."' provided!", E_USER_ERROR);
