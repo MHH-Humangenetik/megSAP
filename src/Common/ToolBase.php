@@ -588,9 +588,6 @@ class ToolBase
 							"[M::mem_pestat]", //BWA mem
 							"[M::process]", //BWA mem
 							"[M::mem_process_seqs]", //BWA mem
-							"PROCESS_REGION_MSECS", //ABRA2
-							"Processing chromosome chunk:", //ABRA2
-							"Clock time in Chromosome:", //ABRA2
 							"WARNING(freebayes): Could not find any mapped reads in target region", //freebayes
 							"No training configuration", //SpliceAI
 							"ms/step", //SpliceAI

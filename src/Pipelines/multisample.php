@@ -270,20 +270,6 @@ if (in_array("vc", $steps))
 			$args[] = "-mode dragen";
 			$parser->execTool("Tools/merge_gvcf.php", implode(" ", $args));
 		}
-		elseif(get_path("use_freebayes")) //perform variant calling with freebayes if set in settings.ini 
-		{
-			$args = array();
-			$args[] = "-bam ".implode(" ", $local_bams);
-			$args[] = "-out {$vcf_all}";
-			$args[] = "-target ".$sys['target_file'];
-			$args[] = "-min_mq 20";
-			$args[] = "-min_af 0.1";
-			$args[] = "-target_extend 200";
-			$args[] = "-build ".$sys['build'];
-			$args[] = "-threads {$threads}";
-			$args[] = "--log ".$parser->getLogFile();
-			$parser->execTool("Tools/vc_freebayes.php", implode(" ", $args), true);
-		}
 		else //calling with DeepVariant with gVCF file creation
 		{
 			//TODO Marc perform gVCF calling in the single sample pipline (if not too slow) and only merge here if all samples already have a gVCF
