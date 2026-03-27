@@ -640,7 +640,7 @@ if (in_array("vc", $steps))
 				$args[] = "-max_gnomad_af 1.00";
 				$args[] = "-min_obs 2";
 				$args[] = "-min_mq 20";
-				$parser->execTool("Tools/vc_mosaic.php", implode(" ", $args)); //TODO Marc: maybe there are better mito callers, see https://pmc.ncbi.nlm.nih.gov/articles/PMC8957813
+				$parser->execTool("Tools/vc_mosaic.php", implode(" ", $args)); //TODO Marc: maybe there are better mito callers, see https://pmc.ncbi.nlm.nih.gov/articles/PMC8957813 and newer papers
 			}
 		
 			if($only_mito_in_target_region) 
@@ -699,45 +699,21 @@ if (in_array("vc", $steps))
 			{
 				$tmp_low_mappability = $parser->tempFile("_low_mappability.vcf.gz");
 
-				if (true) //TODO Marc: DeepVariant seems to bave problems with MAPQ=0 reads > use freebayes for now. Check what the problem is!
-				{
-					$args = [];
-					$args[] = "-bam ".$used_bam_or_cram;
-					$args[] = "-out ".$tmp_low_mappability;
-					$args[] = "-build ".$build;
-					$args[] = "-threads ".$threads;
-					$args[] = "-target ".$roi_low_mappabilty;
-					$args[] = "-min_af ".$min_af;
-					$args[] = "-min_mq 0";
-					$args[] = "-min_bq ".$min_bq;
-					$parser->execTool("Tools/vc_freebayes.php", implode(" ", $args));
-				}
-				else
-				{
-					$args = [];
-					if ($is_wes || $is_panel) $args[] = "-model_type WES";
-					else if ($is_wgs) $args[] = "-model_type WGS";
-					else trigger_error("Unsupported system type '".$sys['type']."' detected in {$system}. Compatible system types are: WES, WGS, Panel, Panel Haloplex.", E_USER_ERROR);
-					$args[] = "-bam ".$used_bam_or_cram;
-					$args[] = "-out ".$tmp_low_mappability;
-					$args[] = "-build ".$build;
-					$args[] = "-threads ".$threads;
-					$args[] = "-target $roi_low_mappabilty";
-					$args[] = "-min_af ".$min_af;
-					$args[] = "-min_mq 0";
-					$args[] = "-min_bq ".$min_bq;
-					$args[] = "-allow_empty_examples";
+				//DeepVariant misses many variant that are on MAPQ=0 reads, even when min_mq is set to 0 > use freebayes for low-mappability calling
+				$args = [];
+				$args[] = "-bam ".$used_bam_or_cram;
+				$args[] = "-out ".$tmp_low_mappability;
+				$args[] = "-build ".$build;
+				$args[] = "-threads ".$threads;
+				$args[] = "-target ".$roi_low_mappabilty;
+				$args[] = "-min_af ".$min_af;
+				$args[] = "-min_mq 0";
+				$args[] = "-min_bq ".$min_bq;
+				$parser->execTool("Tools/vc_freebayes.php", implode(" ", $args));
 
-					$parser->execTool("Tools/vc_deepvariant.php", implode(" ", $args));
-				}
-
-				//unzip
-				$tmp_low_mappability2 = $parser->tempFile("_low_mappability.vcf");
-				$parser->exec("zcat", "$tmp_low_mappability > $tmp_low_mappability2", true);
-				
 				//add to main variant list
 				$tmp2 = $parser->tempFile("_merged_low_mappability.vcf");
-				$parser->execApptainer("ngs-bits", "VcfAdd", "-in $vcf $tmp_low_mappability2 -skip_duplicates -filter low_mappability -filter_desc Variants_in_reads_with_low_mapping_score. -out $tmp2");
+				$parser->execApptainer("ngs-bits", "VcfAdd", "-in $vcf $tmp_low_mappability -skip_duplicates -filter low_mappability -filter_desc Variants_in_reads_with_low_mapping_score. -out $tmp2");
 				$parser->moveFile($tmp2, $vcf);
 			}
 		}
