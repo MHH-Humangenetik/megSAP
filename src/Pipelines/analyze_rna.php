@@ -771,7 +771,20 @@ if (in_array("an", $steps))
 				{
 					$rna_id = get_processed_sample_id($db, $name);
 					$s_id = $db->getValue("SELECT sample_id FROM processed_sample where id=$rna_id");
-					$reference_tissues = $db->getValues("SELECT DISTINCT sdi.disease_info FROM sample s LEFT JOIN sample_relations sr ON s.id=sr.sample1_id OR s.id=sr.sample2_id LEFT JOIN sample_disease_info sdi ON sdi.sample_id=sr.sample1_id OR sdi.sample_id=sr.sample2_id WHERE s.id=$s_id AND sdi.type='RNA reference tissue' AND (sr.relation='same sample' OR sr.relation IS NULL)");
+					$reference_tissues = $db->getValues("SELECT DISTINCT sdi.disease_info FROM sample s LEFT JOIN sample_disease_info sdi ON sdi.sample_id=s.id WHERE s.id=$s_id AND sdi.type='RNA reference tissue'");
+					
+					if (count($reference_tissues) == 0)
+					{
+						#also check other samples related by same sample if none was found:
+						$same_sample_ps = get_related_processed_samples($db, $name, "same sample", "", false);
+						foreach ($same_sample_ps as $ss_ps)
+						{
+							$ss_ps_id = get_processed_sample_id($db, $name);
+							$same_sample_s_id = $db->getValue("SELECT sample_id FROM processed_sample where id=$ss_ps_id");
+							
+							$reference_tissues = array_merge($reference_tissues, $db->getValues("SELECT DISTINCT sdi.disease_info FROM sample s LEFT JOIN sample_disease_info sdi ON sdi.sample_id=s.id WHERE s.id=$same_sample_s_id AND sdi.type='RNA reference tissue'"));
+						}
+					}
 					
 					if (count($reference_tissues) > 0)
 					{
