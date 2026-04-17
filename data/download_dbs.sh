@@ -116,8 +116,8 @@ singularity exec $ngsbits BedSort -with_name -in clinvar_cnvs_2026-04.bed -out c
 cd $dbs
 mkdir -p HGNC
 cd HGNC
-wget -O - https://storage.googleapis.com/public-download-files/hgnc/archive/archive/monthly/tsv/hgnc_complete_set_2025-09-02.tsv > hgnc_complete_set_2025-09-02.tsv
-wget -O - https://storage.googleapis.com/public-download-files/hgnc/archive/archive/monthly/tsv/withdrawn_2025-09-02.tsv > hgnc_withdrawn_2025-09-02.tsv
+wget -O - https://storage.googleapis.com/public-download-files/hgnc/archive/archive/monthly/tsv/hgnc_complete_set_2026-04-07.tsv > hgnc_complete_set_2026-04-07.tsv
+wget -O - https://storage.googleapis.com/public-download-files/hgnc/archive/archive/monthly/tsv/withdrawn_2026-04-07.tsv > hgnc_withdrawn_2026-04-07.tsv
 
 #Install gnomAD (genome data) - 
 cd $dbs
