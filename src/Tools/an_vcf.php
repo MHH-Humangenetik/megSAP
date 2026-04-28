@@ -16,6 +16,7 @@ $parser->addString("build", "The genome build to use.", true, "GRCh38");
 $parser->addInt("threads", "The maximum number of threads used.", true, 1);
 $parser->addFlag("somatic", "Also annotate somatic infos, e.g. COSMIC, cancer hotspots, NGSD somatic counts.");
 $parser->addFlag("no_splice", "Skip SpliceAI scoring of variants that are not precalculated (this can be very slow).");
+$parser->addFlag("gpu", "Use SpliceAI container with GPU acceleration support.");
 $parser->addFlag("annotate_refseq_consequences", "Annotate RefSeq consequences in addition to Ensembl consequences.");
 $parser->addString("low_mappabily_filter", "Mark exonic/splicing variants in low-mappabilty regions with this flag.", true, "");
 $parser->addFlag("test", "Use limited constant NGSD VCF file from test folder for annotation.");
@@ -255,7 +256,9 @@ else
 if (!$no_splice)
 {
 	$tmp = $parser->tempFile("_spliceai_private.vcf");
-	$parser->execTool("Tools/an_spliceai.php", "-in {$vcf_annotate_output} -out {$tmp} -threads {$threads} -build {$build}");
+	$spliceai_args = "-in {$vcf_annotate_output} -out {$tmp} -threads {$threads} -build {$build}";
+	if ($gpu) $spliceai_args .= " -gpu";
+	$parser->execTool("Tools/an_spliceai.php", $spliceai_args);
 	$parser->moveFile($tmp, $vcf_annotate_output);
 }
 

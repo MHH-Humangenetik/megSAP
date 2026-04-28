@@ -16,6 +16,7 @@ $parser->addFloat("max_af", "Maximum gnomAD AF of variants that are scored.", tr
 $parser->addInt("max_vars", "The maximum number of variants to score.", true, 15000);
 $parser->addString("build", "The genome build to use.", true, "GRCh38");
 $parser->addInt("threads", "The maximum number of threads used.", true, 1);
+$parser->addFlag("gpu", "Use SpliceAI container with GPU acceleration support.");
 extract($parser->parse($argv));
 
 //returns the number of variants in a VCF file
@@ -197,8 +198,19 @@ function annotate_spliceai_scores($in, $vcf_filtered, $out)
 	//set bind paths for container execution
 	$in_files = [genome_fasta($build), $vcf_filtered, $transcript_annotations];
 
+	//check GPU availability
+	if ($gpu)
+	{
+		exec("nvidia-smi -L 2>/dev/null", $output, $status);
+		if ($status != 0 || empty($output))
+		{
+			trigger_error("No GPU available to run GPU-accelerated SpliceAI. Falling back to CPU-only version", E_USER_NOTICE);
+			$gpu = false;
+		}
+	}
+	
 	//run spliceai container
-	$spliceai_command = $parser->execApptainer("spliceai", "spliceai", implode(" ", $args), $in_files, [], true);
+	$spliceai_command = $parser->execApptainer("spliceai", "spliceai", implode(" ", $args), $in_files, [], true, true, true, true, $gpu);
 	$prefix = container_platform()=='apptainer' ? "APPTAINERENV" : "SINGULARITYENV";
 	$parser->exec("{$prefix}_OMP_NUM_THREADS={$threads} {$spliceai_command}", "");
 
