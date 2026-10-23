@@ -30,7 +30,7 @@ The following tools are used for mapping and calling of small variants and annot
 
 | step                                           | tool                 | comments  |
 |------------------------------------------------|----------------------|-----------|
-| mapping                                        | minimap2             |           |
+| mapping                                        | minimap2 / pbweave   | pbweave for PacBio, minimap2 for ONT |
 | mapping - extract methylation info             | modkit               |           |
 | variant calling - calling of SNVs and InDels   | clair3               |           |
 | variant calling - decompose complex variants   | vcfallelicprimitives |           |

@@ -42,6 +42,7 @@ container_msisensor-pro = v1.3.0-20251125
 container_ngs-bits = 2026-06-20260615
 container_orad = v2.6.1
 container_paraphase = v3.3.1-20251125
+container_pblab = 20261021
 container_python = v3.10.9-20250729
 container_REViewer = v0.2.7
 container_samblaster = v0.1.26

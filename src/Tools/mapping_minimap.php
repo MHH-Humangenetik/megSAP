@@ -9,7 +9,7 @@ require_once(dirname($_SERVER['SCRIPT_FILENAME'])."/../Common/all.php");
 error_reporting(E_ERROR | E_WARNING | E_PARSE | E_NOTICE);
 
 // parse command line arguments
-$parser = new ToolBase("mapping_minimap", "Maps reads to a reference genome using minimap2.");
+$parser = new ToolBase("mapping_minimap", "Maps reads to a reference genome using minimap2 (ONT) or pbweave (PacBio).");
 $parser->addOutfile("out",  "Output file in BAM format (sorted).", false);
 //optional
 $parser->addString("sample", "Sample name to use in BAM header. If unset the basename of the 'out' file is used.", true, "");
@@ -62,96 +62,125 @@ if(db_is_enabled("NGSD"))
 }
 
 // alignment pipeline:
-// BAM input available:
+// PacBio:
+// pbweave align --sort <input bams or fastqs> (keeps MM/ML tags and input read groups)
+// ONT with BAM input:
 // samtools cat <input bams> | samtools fastq | minimap | samtools sort
-// FASTQ input:
+// ONT with FASTQ input:
 // zcat <input fastqs>                        | minimap | samtools sort
 
 $bam_input = !is_null($in_bam) && (count($in_bam) > 0);
 
-if ($bam_input)
+if ($platform=="PacBio")
 {
-	//get read group description (base calling) from input bams
-	$rg_description = array();
-	foreach ($in_bam as $bam_file) 
-	{
-		$tmp = get_read_group_description($bam_file);
-		$rg_description = array_merge($rg_description, $tmp);	
-	}
-	//remove duplicates
-	$rg_description = array_unique($rg_description);
+	$in_files = $bam_input ? $in_bam : $in_fastq;
+	$fofn = $parser->tempFile(".fofn");
+	file_put_contents($fofn, implode("\n", $in_files)."\n");
 
-	//add to '@RG' entry
-	foreach ($rg_description as $description) 
-	{
-		$group_props[] = $description;
-	}
+	$pbweave_options = [
+		"align",
+		"-j {$threads}",
+		"--sort",
+		"--bam-index BAI",
+		"--unmapped",
+		"--sample {$sample}"
+	];
+	//BAM input: pbweave keeps the read groups of the input BAMs (incl. base calling description)
+	if (!$bam_input) $pbweave_options[] = "--rg '@RG\\t" . implode("\\t", $group_props) . "'";
+	// ponytail: index is built in memory on each run, pre-build '<genome>.wvi' with 'pbweave index' if this gets slow
+	$pbweave_options[] = $genome_fasta;
+	$pbweave_options[] = $fofn;
+	$pbweave_options[] = $bam_current;
+
+	$parser->execApptainer("pblab", "pbweave", implode(" ", $pbweave_options), array_merge($in_files, [$genome_fasta, $fofn]), [dirname($bam_current)]);
 }
-
-$minimap_options = [
-	"-a",
-	"--MD",
-	"-x ".($platform=="PacBio" ? "map-hifi" : "map-ont"),
-	"--eqx",
-	"-t {$threads}",
-	"-R '@RG\\t" . implode("\\t", $group_props) . "'",
-	$genome_fasta
-];
-//include methylation
-if ($bam_input) $minimap_options[] = "-y";
-
-//soft-clip supplement alignments
-if ($softclip_supplements) $minimap_options[] = "-Y";
-
-$pipeline = [];
-
-//start from BAM input if available
-$tmp_fastq = $parser->tempFile(".fastq.gz");
-if ($bam_input)
+else
 {
-	//bam mode: convert bam with samtools fastq
-	$met_tag = "";
-	foreach ($in_bam as $file) 
+
+	if ($bam_input)
 	{
-		//add methylation tag to output
-		if (contains_methylation($file, 100, $sys['build']))
+		//get read group description (base calling) from input bams
+		$rg_description = array();
+		foreach ($in_bam as $bam_file) 
 		{
-			$met_tag = " -TMM,ML ";
-			break;
-		} 
-	} 
-	// make separate calls of samtools fastq in a subshell
-	// samtools cat <aligned.bam> <unaligned.bam> creates invalid BAMs due to different headers
-	$fastq_cmds = [];
-	foreach ($in_bam as $file)
-	{
-		$command = $parser->execApptainer("samtools", "samtools", "fastq --reference {$genome_fasta} -o /dev/null {$met_tag} {$file}", [$file, $genome_fasta], [], true);
-		$fastq_cmds[] = $command;
+			$tmp = get_read_group_description($bam_file);
+			$rg_description = array_merge($rg_description, $tmp);	
+		}
+		//remove duplicates
+		$rg_description = array_unique($rg_description);
+
+		//add to '@RG' entry
+		foreach ($rg_description as $description) 
+		{
+			$group_props[] = $description;
+		}
 	}
-	$fastq_cmds_str = implode("; ", $fastq_cmds);
-	$pipeline[] =  ["", "({$fastq_cmds_str})"];	//perform mapping from STDIN
-	$command = $parser->execApptainer("minimap2", "minimap2", implode(" ", $minimap_options)." - ", [genome_fasta($sys['build'])], [], true);
-	$pipeline[] = ["", $command];
+
+	$minimap_options = [
+		"-a",
+		"--MD",
+		"-x ".($platform=="PacBio" ? "map-hifi" : "map-ont"),
+		"--eqx",
+		"-t {$threads}",
+		"-R '@RG\\t" . implode("\\t", $group_props) . "'",
+		$genome_fasta
+	];
+	//include methylation
+	if ($bam_input) $minimap_options[] = "-y";
+
+	//soft-clip supplement alignments
+	if ($softclip_supplements) $minimap_options[] = "-Y";
+
+	$pipeline = [];
+
+	//start from BAM input if available
+	$tmp_fastq = $parser->tempFile(".fastq.gz");
+	if ($bam_input)
+	{
+		//bam mode: convert bam with samtools fastq
+		$met_tag = "";
+		foreach ($in_bam as $file) 
+		{
+			//add methylation tag to output
+			if (contains_methylation($file, 100, $sys['build']))
+			{
+				$met_tag = " -TMM,ML ";
+				break;
+			} 
+		} 
+		// make separate calls of samtools fastq in a subshell
+		// samtools cat <aligned.bam> <unaligned.bam> creates invalid BAMs due to different headers
+		$fastq_cmds = [];
+		foreach ($in_bam as $file)
+		{
+			$command = $parser->execApptainer("samtools", "samtools", "fastq --reference {$genome_fasta} -o /dev/null {$met_tag} {$file}", [$file, $genome_fasta], [], true);
+			$fastq_cmds[] = $command;
+		}
+		$fastq_cmds_str = implode("; ", $fastq_cmds);
+		$pipeline[] =  ["", "({$fastq_cmds_str})"];	//perform mapping from STDIN
+		$command = $parser->execApptainer("minimap2", "minimap2", implode(" ", $minimap_options)." - ", [genome_fasta($sys['build'])], [], true);
+		$pipeline[] = ["", $command];
+	}
+	else //fastq_mode
+	{	
+		$in_files = array();
+		$in_files = array_merge($in_files, $in_fastq);
+		$in_files[] = genome_fasta($sys['build']);
+
+		//FastQ mapping
+		$command = $parser->execApptainer("minimap2", "minimap2", implode(" ", $minimap_options)." ".implode(" ", $in_fastq), $in_files, [], true);
+		$pipeline[] = ["", $command];
+	}
+
+	//sort BAM by coordinates
+	$tmp_for_sorting = $parser->tempFile();
+	$command = $parser->execApptainer("samtools", "samtools", "sort --reference {$genome_fasta} -T {$tmp_for_sorting} -m 1G -@ ".min($threads, 4)." -o {$bam_current} -", [$genome_fasta], [], true);
+	$pipeline[] = ["", $command];//execute 
+	$parser->execPipeline($pipeline, "mapping");
+
+	//create index
+	$parser->indexBam($bam_current, $threads);
 }
-else //fastq_mode
-{	
-	$in_files = array();
-	$in_files = array_merge($in_files, $in_fastq);
-	$in_files[] = genome_fasta($sys['build']);
-
-	//FastQ mapping
-	$command = $parser->execApptainer("minimap2", "minimap2", implode(" ", $minimap_options)." ".implode(" ", $in_fastq), $in_files, [], true);
-	$pipeline[] = ["", $command];
-}
-
-//sort BAM by coordinates
-$tmp_for_sorting = $parser->tempFile();
-$command = $parser->execApptainer("samtools", "samtools", "sort --reference {$genome_fasta} -T {$tmp_for_sorting} -m 1G -@ ".min($threads, 4)." -o {$bam_current} -", [$genome_fasta], [], true);
-$pipeline[] = ["", $command];//execute 
-$parser->execPipeline($pipeline, "mapping");
-
-//create index
-$parser->indexBam($bam_current, $threads);
 
 //check for missing reads
 if ($bam_input)

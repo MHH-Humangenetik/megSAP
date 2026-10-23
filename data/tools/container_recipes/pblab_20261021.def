@@ -1,0 +1,8 @@
+Bootstrap: docker
+# pblab image built in a separate repository (pbweave, pbdv, pbhappy, pbtruvari, pbsamoa in /usr/local/bin)
+# the 'nextflow' variant is used because the slim image is distroless and has no /bin/sh, which apptainer needs
+From: ghcr.io/mhh-humangenetik/pblab:nextflow-20261021
+
+%environment
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
